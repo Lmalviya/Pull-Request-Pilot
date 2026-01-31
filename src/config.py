@@ -1,19 +1,14 @@
-import os
-from dotenv import load_dotenv
+from pydantic_settings import BaseSettings, SettingsConfigDict
 
-load_dotenv()
+class Settings(BaseSettings):
+    github_webhook_secret: str
+    github_token: str = ""
+    anthropic_api_key: str = ""
+    model_name: str = "claude-3-5-sonnet-20240620"
+    app_name: str = "Pull Request Pilot"
+    debug: bool = False
+    github_base_url: str = "https://api.github.com"
 
-class Settings:
-    # GitHub settings
-    GITHUB_WEBHOOK_SECRET: str = os.getenv("GITHUB_WEBHOOK_SECRET", "")
-    GITHUB_TOKEN: str = os.getenv("GITHUB_TOKEN", "")
-
-    # LLM settings
-    ANTHROPIC_API_KEY: str = os.getenv("ANTHROPIC_API_KEY", "")
-    MODEL_NAME: str = os.getenv("MODEL_NAME", "claude-3-5-sonnet-20240620")
-
-    # API settings
-    APP_NAME: str = "Pull Request Pilot"
-    DEBUG: bool = os.getenv("DEBUG", "False").lower() == "true"
+    model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
