@@ -33,6 +33,33 @@ class UniversalParser:
             self.parsers[language_name] = Parser(lang)
         return self.parsers[language_name]
 
+    def get_semantic_tokens(self, content: str, language_name: str) -> str:
+        """Extracts a normalized string of semantic tokens (ignoring comments/whitespace)."""
+        try:
+            parser = self.get_parser(language_name)
+            tree = parser.parse(bytes(content, "utf8"))
+            tokens = []
+            self._walk_semantic(tree.root_node, tokens)
+            return "".join(tokens)
+        except Exception:
+            return ""
+
+    def _walk_semantic(self, node, tokens):
+        """Recursively collects semantic tokens, ignoring comments."""
+        # Tree-sitter 'extra' nodes are usually comments/whitespace
+        # We also check for 'comment' in the type string for robustness
+        if node.is_extra or "comment" in node.type:
+            return
+
+        if not node.children:
+            text = node.text.decode("utf8").strip()
+            if text:
+                tokens.append(text)
+            return
+
+        for child in node.children:
+            self._walk_semantic(child, tokens)
+
     def parse_structure(self, content: str, language_name: str) -> str:
         try:
             parser = self.get_parser(language_name)

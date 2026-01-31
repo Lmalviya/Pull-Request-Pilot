@@ -15,11 +15,10 @@ Deploy with your choice of LLM provider:
 - **Anthropic**: Claude 3.5 Sonnet, etc.
 - **Ollama**: Run models like `llama3.1` or `mistral` locally for privacy and zero cost.
 
-### 3. **Smart Semantic Filtering**
-Saves tokens and compute by automatically ignoring "noise" files:
-- **Extensions**: `.lock`, `.json`, `.md`, `.png`, etc.
-- **Files**: `.env`, `LICENSE`, `pdm.lock`.
-- **Directories**: `node_modules`, `__pycache__`, `migrations`.
+### 3. **Advanced Semantic Filtering**
+Powered by **Tree-sitter ASTs**, the system detects if changes are purely non-semantic (e.g., updating comments, docstrings, or fixing indentation). If no logic change is detected, it skips the LLM review entirely, saving significant API costs and reducing noise.
+- **Includes**: Traditional ignore lists for `.lock`, `.json`, `.md`.
+- **Logic**: Deep AST comparison for Python, JS, Go, Java, and more.
 
 ### 4. **Flexible Execution Modes**
 - **Sequential**: Processes one chunk at a time (safe for local hardware or strict API limits).
@@ -79,10 +78,10 @@ Ready for deployment with **Docker** and **Docker Compose**, featuring a multi-s
 - [x] OpenAI, Anthropic, and Ollama providers
 - [x] Sequential & Parallel review execution
 - [x] Inline commenting on GitHub PRs
+- [x] **Advanced Semantic Filtering** (AST-based logic change detection)
 
 ### 🚀 Planned Features (To Be Implemented Later)
 - [ ] **GitLab & Bitbucket Support**: Expand SCM services to support other major platforms.
-- [ ] **Advanced Semantic Filtering**: Use AST to detect if changes are only comments or whitespace before reviewing.
 - [ ] **Review Memory**: Allow the agent to remember previous comments to avoid repetitive feedback.
 - [ ] **Custom System Prompts**: Web UI or per-repo configuration for specialized review rules (e.g., security-first, performance-first).
 - [ ] **Support for PR Summary**: Generate a high-level summary of the entire PR in addition to inline comments.

@@ -9,6 +9,7 @@ from src.brain.prompts.prompt_registory import get_system_prompt
 from src.brain.agents.review_agent import ReviewAgent
 from src.utils.filter_utils import should_review_file
 from src.utils.hunk_processor import HunkProcessor
+from src.services.semantic_filter import SemanticFilter
 
 logger = logging.getLogger(__name__)
 
@@ -16,6 +17,7 @@ class ReviewerService:
     def __init__(self):
         self.scm = GitHubSCM(settings.github_token)
         self.llm = self._init_llm_client()
+        self.semantic_filter = SemanticFilter()
 
     def _init_llm_client(self):
         """Initialize and return the configured LLM client."""
@@ -36,6 +38,11 @@ class ReviewerService:
         logger.info(f"Starting review for PR {repo_id}#{pr_id}")
         
         try:
+            # Fetch PR metadata to get base/head refs for semantic filtering
+            pr_data = self.scm.get_pull_request(repo_id, pr_id)
+            base_sha = pr_data.get("base", {}).get("sha")
+            head_sha = pr_data.get("head", {}).get("sha")
+            
             file_diffs = self.scm.get_pull_request_file_diffs(repo_id, pr_id)
         except Exception as e:
             logger.exception(f"Failed to fetch file diffs for PR {pr_id}")
@@ -48,6 +55,18 @@ class ReviewerService:
             
             if not patch or not should_review_file(filename):
                 continue
+
+            # Semantic Filter: skip files where changes are only comments or whitespace
+            try:
+                # We offload large file fetching to external threads to keep event loop responsive
+                old_content = await asyncio.to_thread(self.scm.get_file_content, repo_id, filename, ref=base_sha)
+                new_content = await asyncio.to_thread(self.scm.get_file_content, repo_id, filename, ref=head_sha)
+                
+                if not self.semantic_filter.is_semantic_change(old_content, new_content, filename):
+                    logger.info(f"Skipping {filename}: Change is non-semantic (comments/whitespace only).")
+                    continue
+            except Exception as e:
+                logger.warning(f"Semantic filter failed for {filename}, proceeding with review: {e}")
                 
             # Split patch into small focus chunks (e.g. 10 lines of changes)
             chunks = list(HunkProcessor.chunk_patch(filename, patch, settings.review_max_lines))
