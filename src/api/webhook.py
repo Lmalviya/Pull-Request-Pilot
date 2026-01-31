@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks
-from src.services.scm.github import GitHubService
+from src.handlers.github_handler import GitHubEventHandler
 
 router = APIRouter(prefix="/webhook")
 
@@ -8,7 +8,8 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     body = await request.body()
     signature = request.headers.get("X-Hub-Signature-256")
     
-    if not GitHubService.verify_signature(body, signature):
+    # Use SCM class for static utility
+    if not GitHubEventHandler.verify_signature(body, signature):
         raise HTTPException(status_code=401, detail="Invalid signature")
     
     try:
@@ -20,11 +21,6 @@ async def github_webhook(request: Request, background_tasks: BackgroundTasks):
     if not event:
         raise HTTPException(status_code=400, detail="Missing X-GitHub-Event header")
 
-    if event == "pull_request":
-        action = payload.get("action")
-        # Trigger review on opened or synchronized PRs
-        if action in ["opened", "synchronize"]:
-            background_tasks.add_task(GitHubService.handle_pull_request, payload)
-            return {"status": "review_triggered"}
-            
-    return {"status": "event_ignored"}
+    # Delegate all business logic to the event handler
+    background_tasks.add_task(GitHubEventHandler.handle_event, event, payload)
+    return {"status": "event_received"}

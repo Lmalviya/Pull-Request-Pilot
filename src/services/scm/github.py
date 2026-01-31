@@ -1,35 +1,16 @@
-import hmac
-import hashlib
 import requests
 from fastapi import HTTPException
-from pydantic import BaseModel
 from src.config import settings
 from src.services.scm.base import BaseSCM
 
-# --- data models ---
-
-class GitHubUser(BaseModel):
-    login: str
-
-class PullRequest(BaseModel):
-    title: str
-    user: GitHubUser
-
-class Repository(BaseModel):
-    full_name: str
-
-class PullRequestEvent(BaseModel):
-    action: str
-    number: int
-    pull_request: PullRequest
-    repository: Repository
+from src.code_parser.parser import analysis_file_structure
 
 # --- implementation ---
 
 class GitHubSCM(BaseSCM):
     """
     GitHub implementation of the SCM interface.
-    Handles GitHub-specific operations and webhook verification.
+    Handles GitHub-specific operations.
     """
     
     def __init__(self, token: str):
@@ -39,66 +20,6 @@ class GitHubSCM(BaseSCM):
             "Authorization": f"token {self.token}",
             "Accept": "application/vnd.github.v3.diff"
         }
-
-    @staticmethod
-    def verify_signature(body: bytes, signature_header: str) -> bool:
-        """
-        Verify that the webhook signature matches the expected signature 
-        calculated using the secret.
-        """
-        if not settings.github_webhook_secret:
-            raise HTTPException(status_code=500, detail="GITHUB_WEBHOOK_SECRET not configured")
-
-        if not signature_header:
-            return False
-        
-        expected_prefix = "sha256="
-        if not signature_header.startswith(expected_prefix):
-            return False
-        
-        received_signature = signature_header[len(expected_prefix):]
-        computed_signature = hmac.new(
-            key=settings.github_webhook_secret.encode("utf-8"),
-            msg=body,
-            digestmod=hashlib.sha256
-        ).hexdigest()
-
-        return hmac.compare_digest(received_signature, computed_signature)
-
-    @classmethod
-    async def handle_event(cls, event: str, payload: dict):
-        """
-        Dispatch GitHub webhook events to the appropriate handlers.
-        """
-        if event == "pull_request":
-            pr_event = PullRequestEvent(**payload)
-            await cls.handle_pull_request(pr_event)
-        elif event == "push":
-            cls.handle_push(payload)
-        else:
-            print(f"Unknown GitHub event: {event}")
-
-    @classmethod
-    async def handle_pull_request(cls, pr_event: PullRequestEvent):
-        """
-        Handle pull request events (e.g., opened, synchronized).
-        """
-        action = pr_event.action
-        pr_number = pr_event.number
-        repo_name = pr_event.repository.full_name
-        
-        print(f"GitHub PR event | action={action} | pr={pr_number} | repo={repo_name}")
-        
-        if action in ["opened", "synchronize"]:
-            # Import here to avoid circular dependencies if ReviewerService imports SCM
-            from src.services.reviewer import ReviewerService
-            reviewer = ReviewerService()
-            await reviewer.review_pull_request(repo_name, pr_number)
-
-    @staticmethod
-    def handle_push(payload: dict):
-        ref = payload.get("ref")
-        print(f"GitHub Push event | ref={ref}")
 
     def get_pull_request_diff(self, repo_id: str, pr_id: int) -> str:
         """
@@ -115,6 +36,52 @@ class GitHubSCM(BaseSCM):
                 detail=f"Failed to fetch diff: {response.text}"
             )
         return response.text
+
+    def get_file_structure(self, repo_id: str, file_path: str) -> str:
+        """
+        Analyze the file content and return a high-level structure/outline.
+        Currently supports Python files via AST.
+        """
+        # Fetch the full content to parse structure
+        content = self.get_file_content(repo_id, file_path)
+        return analysis_file_structure(content, file_path)
+
+    def get_file_content(self, repo_id: str, file_path: str, start_line: int = None, end_line: int = None) -> str:
+        """
+        Fetch the content of a file. Supports line-level pagination.
+        """
+        url = f"{self.base_url}/repos/{repo_id}/contents/{file_path}"
+        
+        # Use a local header copy to request raw content instead of JSON/Diff
+        headers = self.headers.copy()
+        headers["Accept"] = "application/vnd.github.v3.raw"
+        
+        response = requests.get(url, headers=headers, timeout=30)
+        
+        if response.status_code != 200:
+            raise HTTPException(
+                status_code=response.status_code, 
+                detail=f"Failed to fetch file content: {response.text}"
+            )
+            
+        content = response.text
+        
+        # Handle line slicing if requested
+        if start_line is not None and end_line is not None:
+            lines = content.splitlines()
+            # Adjust for 0-based index vs 1-based arguments
+            # Ensure indices are within bounds
+            start_index = max(0, start_line - 1)
+            end_index = min(len(lines), end_line)
+            
+            if start_index >= len(lines):
+                return ""
+                
+            selected_lines = lines[start_index:end_index]
+            return "\n".join(selected_lines)
+            
+        return content
+
 
     def post_comment(self, repo_id: str, pr_id: int, body: str) -> bool:
         """

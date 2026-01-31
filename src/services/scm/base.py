@@ -22,3 +22,17 @@ class BaseSCM(ABC):
         Post an inline comment to a specific line in a pull request.
         """
         pass
+
+    @abstractmethod
+    def get_file_content(self, repo_id: str, file_path: str, start_line: int = None, end_line: int = None) -> str:
+        """
+        Fetch the content of a file.
+        If start_line and end_line are provided, returns only that range (1-indexed).
+        """
+    @abstractmethod
+    def get_file_structure(self, repo_id: str, file_path: str) -> str:
+        """
+        Analyze the file content and return a high-level structure/outline
+        (e.g., list of classes and functions with line numbers).
+        """
+        pass
