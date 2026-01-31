@@ -38,11 +38,13 @@ class BaseSCM(ABC):
         pass
 
     @abstractmethod
-    def get_file_content(self, repo_id: str, file_path: str, start_line: int = None, end_line: int = None) -> str:
+    def get_file_content(self, repo_id: str, file_path: str, start_line: int = None, end_line: int = None, ref: str = None) -> str:
         """
         Fetch the content of a file.
         If start_line and end_line are provided, returns only that range (1-indexed).
+        If ref is provided, fetches content from that specific commit/branch.
         """
+        pass
     @abstractmethod
     def get_file_structure(self, repo_id: str, file_path: str) -> str:
         """

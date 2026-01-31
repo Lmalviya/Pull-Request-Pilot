@@ -51,6 +51,12 @@ class GitHubSCM(BaseSCM):
             logger.exception(f"Request to GitHub failed: {e}")
             raise HTTPException(status_code=500, detail=f"Failed to communicate with GitHub: {str(e)}")
 
+    def get_pull_request(self, repo_id: str, pr_id: int) -> dict:
+        """
+        Fetch pull request metadata.
+        """
+        return self._request("GET", f"repos/{repo_id}/pulls/{pr_id}").json()
+
     def get_pull_request_diff(self, repo_id: str, pr_id: int) -> str:
         """
         Fetch the unified diff of the pull request.
@@ -86,11 +92,16 @@ class GitHubSCM(BaseSCM):
         content = self.get_file_content(repo_id, file_path)
         return analysis_file_structure(content, file_path)
 
-    def get_file_content(self, repo_id: str, file_path: str, start_line: int = None, end_line: int = None) -> str:
+    def get_file_content(self, repo_id: str, file_path: str, start_line: int = None, end_line: int = None, ref: str = None) -> str:
         """
-        Fetch the content of a file. Supports line-level pagination.
+        Fetch the content of a file. Supports line-level pagination and commit refs.
         """
-        response = self._request("GET", f"repos/{repo_id}/contents/{file_path}", accept="application/vnd.github.v3.raw")
+        endpoint = f"repos/{repo_id}/contents/{file_path}"
+        params = {}
+        if ref:
+            params['ref'] = ref
+            
+        response = self._request("GET", endpoint, params=params, accept="application/vnd.github.v3.raw")
         content = response.text
         
         if start_line is not None and end_line is not None:
