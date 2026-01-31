@@ -43,9 +43,9 @@ class ReviewerService:
             return []
 
 
-                
-                
-            
-
-            
-            
+if __name__ == "__main__":
+    import asyncio
+    reviewer = ReviewerService()
+    # Use asyncio.run to execute the async function
+    asyncio.run(reviewer.review_pull_request("Lmalviya/Pull-Request-Pilot", 1))
+    
