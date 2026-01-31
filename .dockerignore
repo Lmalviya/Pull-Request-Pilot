@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.venv/
+.git/
+.env
+pdm.lock
+pdm.toml
+.pdm-python
+tests/
+.vscode/
+.idea/
+.DS_Store
