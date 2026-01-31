@@ -14,7 +14,9 @@ class Settings(BaseSettings):
     ollama_model: str = "llama3.1"
     openai_base_url: str = "https://api.openai.com/v1/chat/completions"
     anthropic_base_url: str = "https://api.anthropic.com/v1/messages"
-
+    system_prompt_name: str = ""
+    tool_call_max_retries: int = 3
+    tool_call_retry_delay: int = 5
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 settings = Settings()
