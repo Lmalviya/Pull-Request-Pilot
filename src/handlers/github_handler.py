@@ -45,7 +45,7 @@ class GitHubEventHandler:
             pr_event = PullRequestEvent(**payload)
             await cls.handle_pull_request(pr_event)
         elif event == "push":
-            cls.handle_push(payload)
+            await cls.handle_push(payload)
         else:
             print(f"Unknown GitHub event: {event}")
 
@@ -61,11 +61,19 @@ class GitHubEventHandler:
         print(f"GitHub PR event | action={action} | pr={pr_number} | repo={repo_name}")
         
         if action in ["opened", "synchronize"]:
-            # Now we can import at top level or here, but logic is cleaner
             reviewer = ReviewerService()
             await reviewer.review_pull_request(repo_name, pr_number)
 
     @staticmethod
-    def handle_push(payload: dict):
-        ref = payload.get("ref")
-        print(f"GitHub Push event | ref={ref}")
+    async def handle_push(payload: dict):
+        repo_name = payload.get("repository", {}).get("full_name")
+        commit_sha = payload.get("after")
+        
+        if not repo_name or not commit_sha:
+            print("Skipping push event: Missing repo_name or commit_sha")
+            return
+
+        print(f"GitHub Push event | repo={repo_name} | commit={commit_sha}")
+        
+        reviewer = ReviewerService()
+        await reviewer.review_commit(repo_name, commit_sha)

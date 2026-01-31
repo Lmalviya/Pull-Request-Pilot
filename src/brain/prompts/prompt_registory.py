@@ -1,4 +1,4 @@
-from src.prompts.reviewer_prompt import PERFORMANCE_FOCUSED_PROMPT
+from src.brain.prompts.reviewer_prompt import PERFORMANCE_FOCUSED_PROMPT
 from src.config import settings
 
 PROMPT_REGISTRY = {

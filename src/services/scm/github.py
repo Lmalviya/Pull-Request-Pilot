@@ -1,11 +1,12 @@
+import logging
 import requests
 from fastapi import HTTPException
 from src.config import settings
 from src.services.scm.base import BaseSCM
-
 from src.code_parser.parser import analysis_file_structure
 
-# --- implementation ---
+# Set up logging
+logger = logging.getLogger(__name__)
 
 class GitHubSCM(BaseSCM):
     """
@@ -15,34 +16,73 @@ class GitHubSCM(BaseSCM):
     
     def __init__(self, token: str):
         self.token = token
-        self.base_url = settings.github_base_url
+        self.base_url = settings.github_base_url.rstrip('/')
         self.headers = {
-            "Authorization": f"token {self.token}",
-            "Accept": "application/vnd.github.v3.diff"
+            "Authorization": f"Bearer {self.token}",
+            "Accept": "application/vnd.github.v3+json",
+            "User-Agent": "Pull-Request-Pilot"
         }
+
+    def _request(self, method: str, endpoint: str, accept: str = None, **kwargs) -> requests.Response:
+        """
+        Internal helper for making GitHub API requests.
+        """
+        url = f"{self.base_url}/{endpoint.lstrip('/')}"
+        headers = self.headers.copy()
+        if accept:
+            headers["Accept"] = accept
+            
+        try:
+            response = requests.request(method, url, headers=headers, timeout=30, **kwargs)
+            
+            # Diagnostic for debugging token permissions if needed
+            scopes = response.headers.get("X-OAuth-Scopes")
+            if scopes:
+                logger.debug(f"GitHub Token Scopes: {scopes}")
+                
+            if response.status_code not in (200, 201):
+                logger.error(f"GitHub API Error [{response.status_code}]: {response.text}")
+                raise HTTPException(
+                    status_code=response.status_code, 
+                    detail=f"GitHub API error: {response.text}"
+                )
+            return response
+        except requests.RequestException as e:
+            logger.exception(f"Request to GitHub failed: {e}")
+            raise HTTPException(status_code=500, detail=f"Failed to communicate with GitHub: {str(e)}")
 
     def get_pull_request_diff(self, repo_id: str, pr_id: int) -> str:
         """
         Fetch the unified diff of the pull request.
         """
-        # To get the diff, usage of the header 'application/vnd.github.v3.diff' 
-        # on the PR detail endpoint is required.
-        url = f"{self.base_url}/repos/{repo_id}/pulls/{pr_id}"
-        
-        response = requests.get(url, headers=self.headers, timeout=30)
-        if response.status_code != 200:
-            raise HTTPException(
-                status_code=response.status_code, 
-                detail=f"Failed to fetch diff: {response.text}"
-            )
+        response = self._request("GET", f"repos/{repo_id}/pulls/{pr_id}", accept="application/vnd.github.v3.diff")
+        return response.text
+
+    def get_pull_request_files(self, repo_id: str, pr_id: int) -> list[str]:
+        """
+        Fetch the list of files changed in a pull request.
+        """
+        response = self._request("GET", f"repos/{repo_id}/pulls/{pr_id}/files")
+        return [f["filename"] for f in response.json()]
+
+    def get_pull_request_file_diffs(self, repo_id: str, pr_id: int) -> list[dict]:
+        """
+        Fetch the list of files and their diff patches.
+        """
+        response = self._request("GET", f"repos/{repo_id}/pulls/{pr_id}/files")
+        return response.json()
+
+    def get_commit_diff(self, repo_id: str, commit_sha: str) -> str:
+        """
+        Fetch the unified diff of a specific commit.
+        """
+        response = self._request("GET", f"repos/{repo_id}/commits/{commit_sha}", accept="application/vnd.github.v3.diff")
         return response.text
 
     def get_file_structure(self, repo_id: str, file_path: str) -> str:
         """
         Analyze the file content and return a high-level structure/outline.
-        Currently supports Python files via AST.
         """
-        # Fetch the full content to parse structure
         content = self.get_file_content(repo_id, file_path)
         return analysis_file_structure(content, file_path)
 
@@ -50,82 +90,59 @@ class GitHubSCM(BaseSCM):
         """
         Fetch the content of a file. Supports line-level pagination.
         """
-        url = f"{self.base_url}/repos/{repo_id}/contents/{file_path}"
-        
-        # Use a local header copy to request raw content instead of JSON/Diff
-        headers = self.headers.copy()
-        headers["Accept"] = "application/vnd.github.v3.raw"
-        
-        response = requests.get(url, headers=headers, timeout=30)
-        
-        if response.status_code != 200:
-            raise HTTPException(
-                status_code=response.status_code, 
-                detail=f"Failed to fetch file content: {response.text}"
-            )
-            
+        response = self._request("GET", f"repos/{repo_id}/contents/{file_path}", accept="application/vnd.github.v3.raw")
         content = response.text
         
-        # Handle line slicing if requested
         if start_line is not None and end_line is not None:
             lines = content.splitlines()
-            # Adjust for 0-based index vs 1-based arguments
-            # Ensure indices are within bounds
             start_index = max(0, start_line - 1)
             end_index = min(len(lines), end_line)
-            
-            if start_index >= len(lines):
-                return ""
-                
-            selected_lines = lines[start_index:end_index]
-            return "\n".join(selected_lines)
+            return "\n".join(lines[start_index:end_index]) if start_index < len(lines) else ""
             
         return content
-
 
     def post_comment(self, repo_id: str, pr_id: int, body: str) -> bool:
         """
         Post a general comment on the pull request issue.
         """
-        # Use the issues endpoint for general conversation comments
-        url = f"{self.base_url}/repos/{repo_id}/issues/{pr_id}/comments"
-        
-        data = {"body": body}
-        response = requests.post(url, headers=self.headers, json=data, timeout=30)
-        if response.status_code != 201:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+        self._request("POST", f"repos/{repo_id}/issues/{pr_id}/comments", json={"body": body})
         return True
 
     def post_inline_comment(self, repo_id: str, pr_id: int, file: str, line: int, body: str) -> bool:
         """
         Post a comment on a specific line of the pull request's diff.
         """
-        url = f"{self.base_url}/repos/{repo_id}/pulls/{pr_id}/comments"
-        
-        # 1. Fetch PR to get head commit sha to ensure comment is attached correctly
-        pr_url = f"{self.base_url}/repos/{repo_id}/pulls/{pr_id}"
-        json_headers = self.headers.copy()
-        if "Accept" in json_headers:
-            del json_headers["Accept"] 
-        
+        # Fetch PR to get head commit sha to ensure comment is attached correctly
         commit_id = None
         try:
-            pr_resp = requests.get(pr_url, headers=json_headers, timeout=30)
-            if pr_resp.status_code == 200:
-                commit_id = pr_resp.json().get("head", {}).get("sha")
+            pr_data = self._request("GET", f"repos/{repo_id}/pulls/{pr_id}").json()
+            commit_id = pr_data.get("head", {}).get("sha")
         except Exception as e:
-            print(f"Error fetching PR details: {e}")
+            logger.warning(f"Could not fetch PR details for commit_id: {e}")
 
+        data = {
+            "body": body,
+            "path": file,
+            "line": int(line),
+            "side": "RIGHT"
+        }
+        if commit_id:
+            data["commit_id"] = commit_id
+
+        logger.debug(f"Posting inline comment to {file}:{line} with commit {commit_id}")
+        self._request("POST", f"repos/{repo_id}/pulls/{pr_id}/comments", json=data)
+        return True
+
+    def post_commit_inline_comment(self, repo_id: str, commit_sha: str, file: str, line: int, body: str) -> bool:
+        """
+        Post a comment on a specific line of a commit.
+        """
         data = {
             "body": body,
             "path": file,
             "line": line,
             "side": "RIGHT"
         }
-        if commit_id:
-            data["commit_id"] = commit_id
-
-        response = requests.post(url, headers=self.headers, json=data, timeout=30)
-        if response.status_code != 201:
-            raise HTTPException(status_code=response.status_code, detail=response.text)
+        self._request("POST", f"repos/{repo_id}/commits/{commit_sha}/comments", json=data)
         return True
+

@@ -21,7 +21,7 @@ class OllamaLLM(LLMClient):
             "stream": False
         }
         try:
-            response = requests.post(url, json=data, timeout=120) 
+            response = requests.post(url, json=data, timeout=300) 
             if response.status_code != 200:
                 raise HTTPException(status_code=response.status_code, detail=f"Ollama API Error: {response.text}")
             
@@ -29,3 +29,7 @@ class OllamaLLM(LLMClient):
             return response.json().get("message", {}).get("content", "")
         except requests.exceptions.RequestException as e:
             raise HTTPException(status_code=500, detail=f"Failed to connect to Ollama: {str(e)}")
+
+if __name__ == "__main__":
+    ollama = OllamaLLM()
+    print(ollama.generate_response([{"role": "user", "content": "Hello, how are you?"}]))
