@@ -1,11 +1,30 @@
-from src.code_parser.python_parser import analysis_python_file_structure
+from src.code_parser.tree_sitter_parser import UniversalParser
+
+# Extension to Tree-sitter language name mapping
+EXT_TO_LANG = {
+    "py": "python",
+    "js": "javascript",
+    "jsx": "javascript",
+    "ts": "typescript",
+    "tsx": "typescript",
+    "go": "go",
+    "java": "java",
+    "cpp": "cpp",
+    "c": "c",
+    "rb": "ruby",
+    "rs": "rust",
+}
 
 def analysis_file_structure(content: str, file_path: str) -> str:
-    file_extension = file_path.split(".")[-1]
-    if file_extension == "py":
-        return analysis_python_file_structure(content)
+    file_extension = file_path.split(".")[-1].lower()
+    
+    if file_extension in EXT_TO_LANG:
+        lang_name = EXT_TO_LANG[file_extension]
+        parser = UniversalParser()
+        return parser.parse_structure(content, lang_name)
     else:
-        return "Structure analysis currently only available for Python files."
+        return f"Structure analysis currently only available for: {', '.join(EXT_TO_LANG.keys())}"
+
 
 
 

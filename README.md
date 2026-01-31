@@ -25,7 +25,10 @@ Saves tokens and compute by automatically ignoring "noise" files:
 - **Sequential**: Processes one chunk at a time (safe for local hardware or strict API limits).
 - **Parallel**: Uses `asyncio` to process multiple blocks simultaneously for high-speed reviews.
 
-### 5. **Containerized Architecture**
+### 5. **Universal Code Parser**
+Powered by **Tree-sitter**, the pilot understands the structure (classes, functions, methods) of your code across 9+ languages including **Python, JavaScript, TypeScript, Go, Java, Rust, C, C++, and Ruby**. This allows the AI to stay aware of the semantic context of every change.
+
+### 6. **Containerized Architecture**
 Ready for deployment with **Docker** and **Docker Compose**, featuring a multi-stage `Dockerfile` and automated dependency management via **PDM**.
 
 ---
@@ -71,6 +74,7 @@ Ready for deployment with **Docker** and **Docker Compose**, featuring a multi-s
 ### 🚧 Currently Supported
 - [x] GitHub Webhook Integration (Push & PR events)
 - [x] Multi-stage Tiny Chunking for diffs
+- [x] **Universal Multi-language Parser** (Tree-sitter integration)
 - [x] Configurable ignore lists (extensions/files)
 - [x] OpenAI, Anthropic, and Ollama providers
 - [x] Sequential & Parallel review execution
@@ -78,7 +82,7 @@ Ready for deployment with **Docker** and **Docker Compose**, featuring a multi-s
 
 ### 🚀 Planned Features (To Be Implemented Later)
 - [ ] **GitLab & Bitbucket Support**: Expand SCM services to support other major platforms.
-- [ ] **Advanced Semantic Filtering**: Use AST (Abstract Syntax Tree) to detect if changes are only comments or whitespace before reviewing.
+- [ ] **Advanced Semantic Filtering**: Use AST to detect if changes are only comments or whitespace before reviewing.
 - [ ] **Review Memory**: Allow the agent to remember previous comments to avoid repetitive feedback.
 - [ ] **Custom System Prompts**: Web UI or per-repo configuration for specialized review rules (e.g., security-first, performance-first).
 - [ ] **Support for PR Summary**: Generate a high-level summary of the entire PR in addition to inline comments.
