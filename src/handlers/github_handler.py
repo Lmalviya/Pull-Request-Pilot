@@ -61,7 +61,6 @@ class GitHubEventHandler:
         print(f"GitHub PR event | action={action} | pr={pr_number} | repo={repo_name}")
         
         if action in ["opened", "synchronize"]:
-            # Now we can import at top level or here, but logic is cleaner
             reviewer = ReviewerService()
             await reviewer.review_pull_request(repo_name, pr_number)
 

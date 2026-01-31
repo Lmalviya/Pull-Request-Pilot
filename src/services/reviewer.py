@@ -7,9 +7,6 @@ from src.services.llm.anthropic_client import AnthropicLLM
 from src.brain.prompts.prompt_registory import get_system_prompt
 from src.brain.agents.review_agent import ReviewAgent
 
-# Configure logging
-logger = logging.getLogger("reviewer")
-
 class ReviewerService:
     def __init__(self):
         self.scm = GitHubSCM(settings.github_token)
@@ -23,13 +20,13 @@ class ReviewerService:
             raise ValueError(f"Unsupported LLM provider: {settings.llm_provider}")
 
     async def review_pull_request(self, repo_id: str, pr_id: int):
-        logger.info(f"Starting review for PR {repo_id}#{pr_id}")
+        print(f"Starting review for PR {repo_id}#{pr_id}")
         
         # 1. Fetch Diff
         try:
             diff = self.scm.get_pull_request_diff(repo_id, pr_id)
         except Exception as e:
-            logger.error(f"Failed to fetch diff: {e}")
+            print(f"Failed to fetch diff: {e}")
             return
 
         # 2. Build Prompt
@@ -42,7 +39,7 @@ class ReviewerService:
             comments = agent.run(system_prompt, user_message)
             return comments
         except Exception as e:
-            logger.error(f"Agent failed to complete review: {e}")
+            print(f"Agent failed to complete review: {e}")
             return []
 
 
