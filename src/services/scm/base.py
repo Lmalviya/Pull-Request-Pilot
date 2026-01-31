@@ -10,6 +10,20 @@ class BaseSCM(ABC):
         pass
 
     @abstractmethod
+    def get_pull_request_files(self, repo_id: str, pr_id: int) -> list[str]:
+        """
+        Fetch the list of files changed in a pull request.
+        """
+        pass
+
+    @abstractmethod
+    def get_pull_request_file_diffs(self, repo_id: str, pr_id: int) -> list[dict]:
+        """
+        Fetch the list of files and their diff patches.
+        """
+        pass
+
+    @abstractmethod
     def post_comment(self, repo_id: str, pr_id: int, body: str) -> bool:
         """
         Post a general review comment to a pull request.

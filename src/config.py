@@ -11,8 +11,8 @@ class LLMProvider(str, Enum):
 class Settings(BaseSettings):
     github_token: str = os.getenv("GITHUB_TOKEN")
     github_webhook_secret: str = os.getenv("GITHUB_WEBHOOK_SECRET")
-    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY")
-    openai_api_key: str = os.getenv("OPENAI_API_KEY")
+    anthropic_api_key: str = os.getenv("ANTHROPIC_API_KEY", "")
+    openai_api_key: str = os.getenv("OPENAI_API_KEY", "")
     model_name: str = os.getenv("MODEL_NAME")
     openai_model: str = os.getenv("OPENAI_MODEL")
     app_name: str = "Pull Request Pilot"
@@ -27,6 +27,13 @@ class Settings(BaseSettings):
     system_prompt_name: str = os.getenv("SYSTEM_PROMPT_NAME")
     tool_call_max_retries: int = os.getenv("TOOL_CALL_MAX_RETRIES", 3)
     tool_call_retry_delay: int = os.getenv("TOOL_CALL_RETRY_DELAY", 5)
+    
+    # Review Strategy
+    review_max_lines: int = int(os.getenv("REVIEW_MAX_LINES", 10))
+    review_execution_mode: str = os.getenv("REVIEW_EXECUTION_MODE", "sequential")
+    ignored_extensions: str = os.getenv("IGNORED_EXTENSIONS", ".lock,.json,.map,.svg,.png,.jpg,.jpeg,.pyc,.yml,.toml,.pyd,.md")
+    ignored_files: str = os.getenv("IGNORED_FILES", ".gitignore,.env,LICENSE,CONTRIBUTING.md")
+    ignored_directories: str = os.getenv("IGNORED_DIRECTORIES", "__pycache__,node_modules,.venv,tests,migrations")
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
     def __init__(self):
