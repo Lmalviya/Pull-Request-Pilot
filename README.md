@@ -20,14 +20,24 @@ Powered by **Tree-sitter ASTs**, the system detects if changes are purely non-se
 - **Includes**: Traditional ignore lists for `.lock`, `.json`, `.md`.
 - **Logic**: Deep AST comparison for Python, JS, Go, Java, and more.
 
-### 4. **Flexible Execution Modes**
+### 4. **Review Memory (Stateful Feedback)**
+PR Pilot avoids being repetitive. It remembers every comment it (or others) has already posted on a Pull Request. 
+- **Deduplication**: Before posting, it cross-references new feedback with previous comments using normalization and line-anchoring.
+- **Context Awareness**: The AI is taught its own history, preventing it from nagging developers for issues it already identified.
+
+### 5. **Contextual Tooling (Agentic Context "Pull")**
+If a 10-line diff isn't enough to understand a change, the agent can proactively "reach out" to your codebase.
+- **Function/Class Extraction**: Using Tree-sitter, the agent can call `get_function_content` to see the full implementation of what it's reviewing.
+- **Guardrails**: Fetched code is used for internal validation only; the agent is strictly forbidden from critiquing legacy code, keeping it laser-focused on the PR change.
+
+### 6. **Universal Code Parser**
+Powered by **Tree-sitter**, the pilot understands the structure (classes, functions, methods) of your code across 9+ languages including **Python, JavaScript, TypeScript, Go, Java, Rust, C, C++, and Ruby**. This allows the AI to stay aware of the semantic context of every change.
+
+### 7. **Flexible Execution Modes**
 - **Sequential**: Processes one chunk at a time (safe for local hardware or strict API limits).
 - **Parallel**: Uses `asyncio` to process multiple blocks simultaneously for high-speed reviews.
 
-### 5. **Universal Code Parser**
-Powered by **Tree-sitter**, the pilot understands the structure (classes, functions, methods) of your code across 9+ languages including **Python, JavaScript, TypeScript, Go, Java, Rust, C, C++, and Ruby**. This allows the AI to stay aware of the semantic context of every change.
-
-### 6. **Containerized Architecture**
+### 8. **Containerized Architecture**
 Ready for deployment with **Docker** and **Docker Compose**, featuring a multi-stage `Dockerfile` and automated dependency management via **PDM**.
 
 ---
@@ -79,22 +89,31 @@ Ready for deployment with **Docker** and **Docker Compose**, featuring a multi-s
 - [x] Sequential & Parallel review execution
 - [x] Inline commenting on GitHub PRs
 - [x] **Advanced Semantic Filtering** (AST-based logic change detection)
+- [x] **Review Memory** (Deduplication of feedback)
+- [x] **Contextual Tooling** (Agentic function/class extraction)
 
 ### 🚀 Planned Features (To Be Implemented Later)
 - [ ] **GitLab & Bitbucket Support**: Expand SCM services to support other major platforms.
-- [ ] **Review Memory**: Allow the agent to remember previous comments to avoid repetitive feedback.
-- [ ] **Custom System Prompts**: Web UI or per-repo configuration for specialized review rules (e.g., security-first, performance-first).
 - [ ] **Support for PR Summary**: Generate a high-level summary of the entire PR in addition to inline comments.
-- [ ] **Test Coverage Analysis**: Automatically check if new code has corresponding test changes.
 
 ---
 
-## 📝 Project Structure
+## � Documentation & Deep Dive
+
+For a senior-level technical walkthrough, system design strategy, and future roadmap, refer to the **[Technical Deep Dive](TECHNICAL_DEEP_DIVE.md)**. It covers:
+- **Cost Engineering (FinOps)**: How we track and limit LLM spend.
+- **Scaling Strategies**: Handling monster PRs with hunk hashing and sampling.
+- **Anti-Hallucination**: Multi-stage validation pipelines.
+- **ROI Metrics**: Calculating developer time saved and trust scores.
+
+---
+
+## �📝 Project Structure
 - `src/api`: FastAPI webhook endpoints.
 - `src/services/scm`: logic for interacting with GitHub/GitLab.
 - `src/services/llm`: Clients for different AI providers.
 - `src/utils`: Hunk processing and filtering utilities.
-- `notes/`: Architectural notes and setup guides.
+- `src/code_parser`: Tree-sitter integration for universal parsing.
 
 ---
 
