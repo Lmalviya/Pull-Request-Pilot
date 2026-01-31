@@ -112,3 +112,31 @@ class UniversalParser:
                     return grandchild.text.decode("utf8")
                     
         return "unknown"
+
+    def extract_function_content(self, content: str, language_name: str, target_name: str) -> str:
+        """Finds the content of a function or class by its name."""
+        try:
+            parser = self.get_parser(language_name)
+            tree = parser.parse(bytes(content, "utf8"))
+            
+            node = self._find_node_by_name(tree.root_node, language_name, target_name)
+            if node:
+                return node.text.decode("utf8")
+            return f"Could not find function/class '{target_name}' in the provided content."
+        except Exception as e:
+            return f"Error extracting function content: {str(e)}"
+
+    def _find_node_by_name(self, node, lang, target_name):
+        node_type = node.type
+        mapping = NODE_TYPES.get(lang, {})
+        
+        if node_type in mapping:
+            name = self._extract_name(node)
+            if name == target_name:
+                return node
+        
+        for child in node.children:
+            result = self._find_node_by_name(child, lang, target_name)
+            if result:
+                return result
+        return None

@@ -52,3 +52,17 @@ class BaseSCM(ABC):
         (e.g., list of classes and functions with line numbers).
         """
         pass
+
+    @abstractmethod
+    def get_pull_request_comments(self, repo_id: str, pr_id: int) -> list[dict]:
+        """
+        Fetch all comments on a pull request, including inline comments.
+        """
+        pass
+
+    @abstractmethod
+    def get_function_content(self, repo_id: str, file_path: str, function_name: str) -> str:
+        """
+        Fetch the full content of a specific function or class.
+        """
+        pass

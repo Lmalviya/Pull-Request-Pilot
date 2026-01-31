@@ -3,7 +3,7 @@ import requests
 from fastapi import HTTPException
 from src.config import settings
 from src.services.scm.base import BaseSCM
-from src.code_parser.parser import analysis_file_structure
+from src.code_parser.parser import analysis_file_structure, get_function_content as extract_function_content
 
 # Set up logging
 logger = logging.getLogger(__name__)
@@ -156,4 +156,19 @@ class GitHubSCM(BaseSCM):
         }
         self._request("POST", f"repos/{repo_id}/commits/{commit_sha}/comments", json=data)
         return True
+
+    def get_pull_request_comments(self, repo_id: str, pr_id: int) -> list[dict]:
+        """
+        Fetch all inline comments on a pull request.
+        """
+        endpoint = f"repos/{repo_id}/pulls/{pr_id}/comments"
+        response = self._request("GET", endpoint)
+        return response.json()
+
+    def get_function_content(self, repo_id: str, file_path: str, function_name: str) -> str:
+        """
+        Fetch the full content of a specific function or class.
+        """
+        content = self.get_file_content(repo_id, file_path)
+        return extract_function_content(content, file_path, function_name)
 
