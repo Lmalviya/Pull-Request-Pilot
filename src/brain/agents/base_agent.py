@@ -7,7 +7,8 @@ class BaseAgent:
         self.tool_call_max_retries = int(settings.tool_call_max_retries)
         self.tool_call_retry_delay = int(settings.tool_call_retry_delay)
         self.registered_tools = {
-            "get_file_structure": self.scm.get_file_structure
+            "get_file_structure": self.scm.get_file_structure,
+            "get_function_content": self.scm.get_function_content
         }
 
     def llm_output_validator(self, response_text: str) -> tuple[bool, dict | None, str]:

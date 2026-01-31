@@ -76,9 +76,28 @@ class ReviewerService:
             logger.info(f"No changes requiring review for PR {pr_id} after filtering.")
             return []
 
+        # Review Memory: Fetch existing comments to avoid repetition
+        logger.info(f"Fetching existing comments for PR {pr_id} to initialize review memory.")
+        try:
+            existing_comments = await asyncio.to_thread(self.scm.get_pull_request_comments, repo_id, pr_id)
+        except Exception as e:
+            logger.warning(f"Failed to fetch existing comments: {e}")
+            existing_comments = []
+
+        # Group comments by file for efficient memory passing
+        memory_by_file = {}
+        for comment in existing_comments:
+            file_path = comment.get('path')
+            if not file_path: continue
+            
+            if file_path not in memory_by_file:
+                memory_by_file[file_path] = []
+            
+            # Simplified comment representation for the prompt
+            memory_by_file[file_path].append(f"Line {comment.get('line')}: {comment.get('body')}")
+
         logger.info(f"Processing {len(review_tasks)} review chunks in {settings.review_execution_mode} mode.")
 
-        system_prompt = get_system_prompt()
         all_comments = []
 
         if settings.review_execution_mode == "parallel":
@@ -87,21 +106,25 @@ class ReviewerService:
             
             async def process_task(task):
                 async with semaphore:
+                    filename = task['filename']
+                    prev_comments = "\n".join(memory_by_file.get(filename, ["None"]))
                     # Offload sync agent call to a thread
-                    return await asyncio.to_thread(self._run_agent_on_chunk, system_prompt, repo_id, pr_id, task)
+                    return await asyncio.to_thread(self._run_agent_on_chunk, prev_comments, repo_id, pr_id, task)
             
             results = await asyncio.gather(*(process_task(t) for t in review_tasks))
             for res in results:
                 all_comments.extend(res)
         else:
             for task in review_tasks:
-                comments = self._run_agent_on_chunk(system_prompt, repo_id, pr_id, task)
+                filename = task['filename']
+                prev_comments = "\n".join(memory_by_file.get(filename, ["None"]))
+                comments = self._run_agent_on_chunk(prev_comments, repo_id, pr_id, task)
                 all_comments.extend(comments)
         
         logger.info(f"Completed PR review with {len(all_comments)} comments.")
         return all_comments
 
-    def _run_agent_on_chunk(self, system_prompt: str, repo_id: str, pr_id: int, chunk: dict) -> list:
+    def _run_agent_on_chunk(self, previous_comments: str, repo_id: str, pr_id: int, chunk: dict) -> list:
         """
         Runs the ReviewAgent on a single code chunk and posts resulting comments.
         """
@@ -120,15 +143,32 @@ class ReviewerService:
             f"Note: Only provide comments for the lines shown above. Use the provided line numbers exactly."
         )
         
+        # Inject memory into system prompt
+        system_prompt = get_system_prompt(previous_feedback=previous_comments)
+        
         agent = ReviewAgent(self.llm, self.scm)
         try:
             comments = agent.run(system_prompt, user_message)
+            
+            # Post-generation Deduplication Filter
+            # Even if the LLM repeats itself, we catch it here.
+            filtered_comments = []
+            normalized_memory = [c.lower().strip() for c in previous_comments.split('\n')]
+
             for c in comments:
-                # IMPORTANT: Use the filename from the chunk context. 
-                # Trusting the agent to return the exact repo-relative path is prone to hallucination 
-                # or formatting errors (like adding ./), leading to 'path could not be resolved' API errors.
-                self.scm.post_inline_comment(repo_id, pr_id, filename, c['line'], c['comment'])
-            return comments
+                comment_line = int(c['line'])
+                comment_body = c['comment']
+                
+                # Check for exact or very similar existing comment on the same line
+                memory_entry = f"line {comment_line}: {comment_body.lower().strip()}"
+                if memory_entry in normalized_memory:
+                    logger.info(f"Skipping duplicate comment on {filename}:{comment_line}")
+                    continue
+                
+                self.scm.post_inline_comment(repo_id, pr_id, filename, comment_line, comment_body)
+                filtered_comments.append(c)
+                
+            return filtered_comments
         except Exception as e:
             logger.error(f"Agent failed for {filename} chunk: {e}")
             return []
@@ -142,7 +182,7 @@ class ReviewerService:
             logger.exception(f"Failed to fetch commit diff: {commit_sha}")
             return []
 
-        system_prompt = get_system_prompt()
+        system_prompt = get_system_prompt(previous_feedback="None")
         user_message = f"Repository: {repo_id}\nCommit: {commit_sha}\n\nDiff Content:\n{diff}"
         
         agent = ReviewAgent(self.llm, self.scm)

@@ -25,6 +25,16 @@ def analysis_file_structure(content: str, file_path: str) -> str:
     else:
         return f"Structure analysis currently only available for: {', '.join(EXT_TO_LANG.keys())}"
 
+def get_function_content(content: str, file_path: str, target_name: str) -> str:
+    file_extension = file_path.split(".")[-1].lower()
+    
+    if file_extension in EXT_TO_LANG:
+        lang_name = EXT_TO_LANG[file_extension]
+        parser = UniversalParser()
+        return parser.extract_function_content(content, lang_name, target_name)
+    else:
+        return f"Function extraction currently only available for: {', '.join(EXT_TO_LANG.keys())}"
+
 
 
 
